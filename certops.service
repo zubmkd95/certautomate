@@ -1,0 +1,8 @@
+[Unit]
+Description=certops certificate renewal
+
+[Service]
+Type=oneshot
+WorkingDirectory=/opt/certops
+EnvironmentFile=/etc/certops.env
+ExecStart=/usr/bin/python3 -m certops -c /opt/certops/config.yaml renew

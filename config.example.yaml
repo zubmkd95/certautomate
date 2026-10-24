@@ -1,0 +1,61 @@
+# certops configuration. Copy to config.yaml and edit.
+# Secrets are NEVER stored here: they are read from environment variables.
+
+renew_before_days: 30
+
+ca:
+  dir: ./pki                      # where issued certs + audit log live
+  # Using an EXISTING OpenSSL CA? point at it (and remove `init-ca` from your workflow):
+  # cert: /etc/pki/myca/ca.crt
+  # key:  /etc/pki/myca/ca.key
+  # chain_extra: /etc/pki/myca/intermediate.crt   # if signing with an intermediate
+  key_pass_env: CERTOPS_CA_PASS   # env var holding the CA key passphrase (remove if key is unencrypted)
+  default_days: 397
+  leaf_key_type: rsa2048          # rsa2048 | rsa4096 | ecdsa-p256 | ecdsa-p384
+  p12_legacy: false               # set true if ClearPass rejects the PKCS#12 (older ciphers)
+
+targets:
+  - name: fw1
+    type: fortigate
+    host: 192.0.2.1
+    port: 443                     # admin HTTPS port (also used for the live expiry check)
+    api_token_env: FG1_TOKEN      # REST API admin token
+    verify_tls: false             # after first deploy you can set this to ./pki/ca/ca.crt
+    vdom: root
+    services: [admin-gui, ssl-vpn]
+    cert_name_prefix: fw1-web
+    common_name: fw1.example.local
+    sans: ["DNS:fw1.example.local", "IP:192.0.2.1"]
+
+  - name: fw2
+    type: fortigate
+    host: 192.0.2.2
+    api_token_env: FG2_TOKEN
+    verify_tls: false
+    services: [admin-gui, ssl-vpn]
+    cert_name_prefix: fw2-web
+    common_name: fw2.example.local
+    sans: ["DNS:fw2.example.local", "IP:192.0.2.2"]
+
+  - name: clearpass
+    type: clearpass
+    host: 192.0.2.10
+    client_id: certops            # API client created in ClearPass Guest/Admin > API Services
+    client_secret_env: CP_SECRET
+    verify_tls: false
+    server_name: cppm1.example.local   # node name exactly as in Administration > Server Manager
+    services: ["HTTPS(RSA)", "RADIUS"]
+    serve_host: 192.0.2.50        # IP of the machine running certops, reachable from ClearPass
+    serve_port: 8765              # must be allowed through any firewall between ClearPass and this host
+    common_name: cppm1.example.local
+    sans: ["DNS:cppm1.example.local", "IP:192.0.2.10"]
+    ekus: [serverAuth, clientAuth]
+
+# Optional alerts
+notify:
+  webhook_url_env: CERTOPS_WEBHOOK      # Slack/Teams-style incoming webhook URL in this env var
+  # email:
+  #   host: smtp.example.local
+  #   port: 25
+  #   from: certops@example.local
+  #   to: [netops@example.local]
